@@ -10,21 +10,86 @@ import json
 import time
 import keyboard
 import os
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+import maskpass
 
-url ="https://www.hentaiheroes.com/"
-user = "gioste.rule32@virgilio.it"
-password = "Nemomilla1"
+URL = "https://www.hentaiheroes.com/"
+KEY_FILE = "key.bin"
+IV_FILE = "iv.bin"
+CRYPTED_USER_FILE = "crypted_user.bin"
+CRYPTED_PASSWORD_FILE = "crypted_password.bin"
 
-## Opening JSON file
-#with open('Data.json', 'r') as openfile:
-#
-#    # Reading from json file
-#    json_object = json.load(openfile)
-#
+# Generate a key and IV for encryption if they don't exist
+if not os.path.exists(KEY_FILE):
+    key = os.urandom(32) # 256-bit key
+    with open(KEY_FILE, "wb") as f:
+        f.write(key)
+else:
+    with open(KEY_FILE, "rb") as f:
+        key = f.read()
+
+if not os.path.exists(IV_FILE):
+    iv = os.urandom(16) # 128-bit IV
+    with open(IV_FILE, "wb") as f:
+        f.write(iv)
+else:
+    with open(IV_FILE, "rb") as f:
+        iv = f.read()
+        
+
+# Encryption
+def encrypt(plaintext, key, iv):
+    # Initialize the cipher
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+
+    # Encrypt the data, padding it to a multiple of the block size
+    pad_len = 16 - (len(plaintext) % 16)
+    padded_plaintext = plaintext + bytes([pad_len] * pad_len)
+    ciphertext = encryptor.update(padded_plaintext) + encryptor.finalize()
+    return ciphertext
+
+# Decryption
+def decrypt(ciphertext, key, iv):
+    # Initialize the cipher
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+
+    # Decrypt the data
+    padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+
+    # Remove padding from the plaintext
+    pad_len = padded_plaintext[-1]
+    plaintext = padded_plaintext[:-pad_len]
+    return plaintext
 
 
+if not os.path.exists(CRYPTED_USER_FILE):
+    # Input username and password
+    username = maskpass.askpass(prompt="User:", mask="•").encode()
+    password = maskpass.askpass(prompt="Password:", mask="•").encode()
+    # Encrypt username and password
+    crypted_username = encrypt(username, key, iv)
+    crypted_password = encrypt(password, key, iv)
+        # Save encrypted username and password
+    with open(CRYPTED_USER_FILE, "wb") as f:
+        f.write(crypted_username)
 
-os.system("cls")
+    with open(CRYPTED_PASSWORD_FILE, "wb") as f:
+        f.write(crypted_password)
+else:
+    # Load encrypted username and password
+    with open(CRYPTED_USER_FILE, "rb") as f:
+        crypted_username = f.read()
+
+    with open(CRYPTED_PASSWORD_FILE, "rb") as f:
+        crypted_password = f.read()
+
+# Decrypt username and password
+username = decrypt(crypted_username, key, iv).decode()
+password = decrypt(crypted_password, key, iv).decode()
+
 
 def PanicButton():
     while True:
@@ -40,14 +105,15 @@ def Next(STR):
 
 def WaitUntillVisible_CSS_AND_CLICK(Path):
     WebDriverWait(driver, 10).until(
-    EC.visibility_of_element_located((By.CSS_SELECTOR, Path))
+        EC.visibility_of_element_located((By.CSS_SELECTOR, Path))
     )
     driver.find_element(By.CSS_SELECTOR, Path).click()
 
 
 def WaitUntillVisible_XPATH_AND_CLICK(Path):
     WebDriverWait(driver, 10).until(
-    EC.visibility_of_element_located((By.XPATH, Path)))
+        EC.visibility_of_element_located((By.XPATH, Path))
+    )
     driver.find_element(By.XPATH, Path).click()
 
 def main():
@@ -62,7 +128,7 @@ def main():
 
 
     Next("Opening browser") # opens the browser
-    driver.get(url)
+    driver.get(URL)
     Iframe_main = driver.find_element(By.XPATH, "/html/body/iframe") #main iframe
     driver.switch_to.frame(Iframe_main)
 
@@ -72,7 +138,7 @@ def main():
     Iframe_registration = driver.find_element(By.XPATH, "/html/body/div[8]/iframe") 
     driver.switch_to.frame(Iframe_registration)
     WaitUntillVisible_XPATH_AND_CLICK("/html/body/div/form[2]/div/div[1]/input") #user field
-    driver.find_element(By.XPATH, "/html/body/div/form[2]/div/div[1]/input").send_keys(user) #user field
+    driver.find_element(By.XPATH, "/html/body/div/form[2]/div/div[1]/input").send_keys(username) #user field
     driver.find_element(By.XPATH, "/html/body/div/form[2]/div/div[2]/input").send_keys(password) #password field
     driver.find_element(By.XPATH, "/html/body/div/form[2]/div/button").click() #login button
     WebDriverWait(driver, 10).until(
