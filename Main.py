@@ -33,6 +33,10 @@ def PanicButton():
             print("The panic button has been pressed")
             quit()
 
+
+
+#new test for yk
+
 def Next(STR):
     time.sleep(0.5) 
     os.system("cls")
